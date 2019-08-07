@@ -25,8 +25,11 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.OutputFormat;
 import org.apache.hadoop.util.Progressable;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.Properties;
+
+import static org.apache.hive.storage.jdbc.conf.Constants.*;
 
 public class JdbcOutputFormat implements OutputFormat<NullWritable, MapWritable>,
                                          HiveOutputFormat<NullWritable, MapWritable> {
@@ -34,6 +37,8 @@ public class JdbcOutputFormat implements OutputFormat<NullWritable, MapWritable>
   /**
    * {@inheritDoc}
    */
+  // TODO: Implement giving hdfs file sink.
+
   @Override
   public RecordWriter getHiveRecordWriter(JobConf jc,
       Path finalOutPath,
@@ -41,6 +46,9 @@ public class JdbcOutputFormat implements OutputFormat<NullWritable, MapWritable>
       boolean isCompressed,
       Properties tableProperties,
       Progressable progress) throws IOException {
+      final RecordWriter recordWriter;
+      FileSystem fs = finalOutPath.getFileSystem(jc);
+      String dbTable = jc.get(JDBC_TABLE);
     throw new UnsupportedOperationException("Write operations are not allowed.");
   }
 

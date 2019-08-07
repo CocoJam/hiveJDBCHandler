@@ -14,11 +14,11 @@
  */
 
 package org.apache.hive.storage.jdbc;
-
+import org.apache.hive.storage.jdbc.conf.Constants.*;
 import org.apache.commons.lang3.tuple.MutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hive.conf.Constants;
+//import org.apache.hadoop.hive.conf.Constants;
 import org.apache.hadoop.hive.ql.io.HiveInputFormat;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
@@ -31,6 +31,7 @@ import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.RecordReader;
 import org.apache.hadoop.mapred.Reporter;
+import org.apache.hive.storage.jdbc.conf.Constants;
 import org.apache.hive.storage.jdbc.spitter.IntervalSplitter;
 import org.apache.hive.storage.jdbc.spitter.IntervalSplitterFactory;
 import org.slf4j.Logger;

@@ -16,14 +16,13 @@ package org.apache.hive.storage.jdbc;
 
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.NullWritable;
-import org.apache.hadoop.io.MapWritable;
+//import org.apache.hadoop.io.MapWritable;
 import org.apache.hadoop.io.ObjectWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.RecordReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import org.apache.hive.storage.jdbc.dao.DatabaseAccessor;
 import org.apache.hive.storage.jdbc.dao.DatabaseAccessorFactory;
 import org.apache.hive.storage.jdbc.dao.JdbcRecordIterator;
@@ -32,7 +31,7 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.Map.Entry;
 
-public class JdbcRecordReader implements RecordReader<LongWritable, MapWritable> {
+public class JdbcRecordReader implements RecordReader<LongWritable, JdbcWritable> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(JdbcRecordReader.class);
   private DatabaseAccessor dbAccessor = null;
@@ -50,7 +49,7 @@ public class JdbcRecordReader implements RecordReader<LongWritable, MapWritable>
 
 
   @Override
-  public boolean next(LongWritable key, MapWritable value) throws IOException {
+  public boolean next(LongWritable key, JdbcWritable value) throws IOException {
     try {
       LOGGER.trace("JdbcRecordReader.next called");
       if (dbAccessor == null) {
@@ -94,8 +93,8 @@ public class JdbcRecordReader implements RecordReader<LongWritable, MapWritable>
 
 
   @Override
-  public MapWritable createValue() {
-    return new MapWritable();
+  public JdbcWritable createValue() {
+    return new JdbcWritable();
   }
 
 

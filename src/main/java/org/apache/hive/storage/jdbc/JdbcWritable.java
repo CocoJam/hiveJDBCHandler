@@ -15,13 +15,15 @@ public class JdbcWritable implements Writable, org.apache.hadoop.mapred.lib.db.D
         org.apache.hadoop.mapreduce.lib.db.DBWritable {
     private Object[] columnValues;
     private int[] columnTypes;
-
+    public HashMap<Writable,Writable> map ;
     public JdbcWritable() {
+        map = new HashMap<>();
     }
 
     public JdbcWritable(Object[] columnValues, int[] columnTypes) {
         this.columnValues = columnValues;
         this.columnTypes = columnTypes;
+        map = new HashMap<>();
     }
 
     @Override
@@ -100,39 +102,39 @@ public class JdbcWritable implements Writable, org.apache.hadoop.mapred.lib.db.D
         Arrays.fill(columnValues, null);
     }
 //    @Override
-//    public int size() {
-//        return propertyMapping.size();
-//    }
+    public int size() {
+        return map.size();
+    }
 //
 //    @Override
-//    public boolean isEmpty() {
-//        return propertyMapping.isEmpty();
-//    }
+    public boolean isEmpty() {
+        return map.isEmpty();
+    }
 //
 //    @Override
-//    public boolean containsKey(Object key) {
-//        return ;
-//    }
+    public boolean containsKey(Writable key) {
+        return map.containsKey(key);
+    }
 //
 //    @Override
-//    public boolean containsValue(Object value) {
-//        return false;
-//    }
+    public boolean containsValue(Writable value) {
+        return map.containsValue(value);
+    }
 //
 //    @Override
-//    public Object get(Object key) {
-//        return null;
-//    }
+    public Object get(Writable key) {
+        return map.get(key);
+    }
 //
 //    @Override
-//    public Object put(Object key, Object value) {
-//        return null;
-//    }
+    public Object put(Writable key, Writable value) {
+        return map.put(key,value);
+    }
 //
 //    @Override
-//    public Object remove(Object key) {
-//        return null;
-//    }
+    public Object remove(Writable key) {
+        return map.remove(key);
+    }
 //
 //    @Override
 //    public void putAll(Map m) {

@@ -43,7 +43,7 @@ import org.apache.hive.storage.jdbc.dao.DatabaseAccessorFactory;
 import java.io.IOException;
 import java.util.List;
 
-public class JdbcInputFormat extends HiveInputFormat<LongWritable, MapWritable> {
+public class JdbcInputFormat extends HiveInputFormat<LongWritable, JdbcWritable> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(JdbcInputFormat.class);
   private DatabaseAccessor dbAccessor = null;
@@ -53,7 +53,7 @@ public class JdbcInputFormat extends HiveInputFormat<LongWritable, MapWritable> 
    * {@inheritDoc}
    */
   @Override
-  public RecordReader<LongWritable, MapWritable>
+  public RecordReader<LongWritable, JdbcWritable>
     getRecordReader(InputSplit split, JobConf job, Reporter reporter) throws IOException {
 
     if (!(split instanceof JdbcInputSplit)) {

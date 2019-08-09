@@ -14,9 +14,9 @@
  */
 package org.apache.hive.config;
 
-import org.apache.hive.storage.jdbc.conf.DatabaseType;
-import org.apache.hive.storage.jdbc.conf.JdbcStorageConfig;
-import org.apache.hive.storage.jdbc.conf.JdbcStorageConfigManager;
+import org.apache.hive.storage.jdbc.conf.config.DatabaseType;
+import org.apache.hive.storage.jdbc.conf.config.JdbcStorageConfig;
+import org.apache.hive.storage.jdbc.conf.config.JdbcStorageConfigManager;
 import org.junit.Ignore;
 import org.junit.Test;
 

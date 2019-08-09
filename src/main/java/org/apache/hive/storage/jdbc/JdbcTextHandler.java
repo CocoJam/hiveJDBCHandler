@@ -14,46 +14,27 @@
  */
 package org.apache.hive.storage.jdbc;
 
-import org.apache.commons.lang3.tuple.MutablePair;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.Constants;
 import org.apache.hadoop.hive.metastore.HiveMetaHook;
-import org.apache.hadoop.hive.ql.exec.FileSinkOperator;
-import org.apache.hadoop.hive.ql.io.HiveInputFormat;
-import org.apache.hadoop.hive.ql.io.HiveOutputFormat;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.HiveStorageHandler;
 import org.apache.hadoop.hive.ql.metadata.JarUtils;
 import org.apache.hadoop.hive.ql.plan.TableDesc;
 import org.apache.hadoop.hive.ql.security.authorization.HiveAuthorizationProvider;
-import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.AbstractSerDe;
-import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
-import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
-import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils;
-import org.apache.hadoop.io.LongWritable;
-import org.apache.hadoop.io.NullWritable;
-import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapred.*;
-import org.apache.hadoop.util.Progressable;
-import org.apache.hive.storage.jdbc.dao.DatabaseAccessor;
-import org.apache.hive.storage.jdbc.dao.DatabaseAccessorFactory;
-import org.apache.hive.storage.jdbc.spitter.IntervalSplitter;
-import org.apache.hive.storage.jdbc.spitter.IntervalSplitterFactory;
+import org.apache.hive.storage.jdbc.records.JdbcSerDe;
+import org.apache.hive.storage.jdbc.split.JdbcInputSplit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hive.storage.jdbc.conf.JdbcStorageConfigManager;
+import org.apache.hive.storage.jdbc.conf.config.JdbcStorageConfigManager;
 import java.io.IOException;
 import java.lang.IllegalArgumentException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-
-import static org.apache.hive.storage.jdbc.conf.Constants.JDBC_TABLE;
 
 public class JdbcTextHandler implements HiveStorageHandler {
 
@@ -77,152 +58,152 @@ public class JdbcTextHandler implements HiveStorageHandler {
   @Override
   public Class<? extends InputFormat> getInputFormatClass() {
 
-    return (new HiveInputFormat<LongWritable, JdbcWritable> (){
-      private DatabaseAccessor dbAccessor = null;
-
-      /**
-       * {@inheritDoc}
-       */
-      @Override
-      public RecordReader<LongWritable, JdbcWritable>
-      getRecordReader(InputSplit split, JobConf job, Reporter reporter) throws IOException {
-
-        if (!(split instanceof JdbcInputSplit)) {
-          throw new RuntimeException("Incompatible split type " + split.getClass().getName() + ".");
-        }
-
-        return new JdbcRecordReader(job, (JdbcInputSplit) split);
-      }
-
-
-      /**
-       * {@inheritDoc}
-       */
-      @Override
-      public InputSplit[] getSplits(JobConf job, int numSplits) throws IOException {
-        try {
-
-          String partitionColumn = job.get(org.apache.hive.storage.jdbc.conf.Constants.JDBC_PARTITION_COLUMN);
-          int numPartitions = job.getInt(org.apache.hive.storage.jdbc.conf.Constants.JDBC_NUM_PARTITIONS, -1);
-          String lowerBound = job.get(org.apache.hive.storage.jdbc.conf.Constants.JDBC_LOW_BOUND);
-          String upperBound = job.get(org.apache.hive.storage.jdbc.conf.Constants.JDBC_UPPER_BOUND);
-
-          InputSplit[] splits;
-
-          if (!job.getBoolean(org.apache.hive.storage.jdbc.conf.Constants.JDBC_SPLIT_QUERY, true) || numPartitions <= 1) {
-            // We will not split this query if:
-            // 1. hive.sql.query.split is set to false (either manually or automatically by calcite
-            // 2. numPartitions == 1
-            splits = new InputSplit[1];
-            splits[0] = new JdbcInputSplit(FileInputFormat.getInputPaths(job)[0]);
-            LOGGER.info("Creating 1 input split " + splits[0]);
-            return splits;
-          }
-
-          dbAccessor = DatabaseAccessorFactory.getAccessor(job);
-          Path[] tablePaths = FileInputFormat.getInputPaths(job);
-
-          // We will split this query into n splits
-          LOGGER.debug("Creating {} input splits", numPartitions);
-
-          if (partitionColumn != null) {
-            List<String> columnNames = dbAccessor.getColumnNames(job);
-            if (!columnNames.contains(partitionColumn)) {
-              throw new IOException("Cannot find partitionColumn:" + partitionColumn + " in " + columnNames);
-            }
-            List<TypeInfo> hiveColumnTypesList = TypeInfoUtils.getTypeInfosFromTypeString(job.get(serdeConstants.LIST_COLUMN_TYPES));
-            TypeInfo typeInfo = hiveColumnTypesList.get(columnNames.indexOf(partitionColumn));
-            if (!(typeInfo instanceof PrimitiveTypeInfo)) {
-              throw new IOException(partitionColumn + " is a complex type, only primitive type can be a partition column");
-            }
-            if (lowerBound == null || upperBound == null) {
-              Pair<String, String> boundary = dbAccessor.getBounds(job, partitionColumn, lowerBound == null,
-                      upperBound == null);
-              if (lowerBound == null) {
-                lowerBound = boundary.getLeft();
-              }
-              if (upperBound == null) {
-                upperBound = boundary.getRight();
-              }
-            }
-            if (lowerBound == null) {
-              throw new IOException("lowerBound of " + partitionColumn + " cannot be null");
-            }
-            if (upperBound == null) {
-              throw new IOException("upperBound of " + partitionColumn + " cannot be null");
-            }
-            IntervalSplitter intervalSplitter = IntervalSplitterFactory.newIntervalSpitter(typeInfo);
-            List<MutablePair<String, String>> intervals = intervalSplitter.getIntervals(lowerBound, upperBound, numPartitions,
-                    typeInfo);
-            if (intervals.size()<=1) {
-              LOGGER.debug("Creating 1 input splits");
-              splits = new InputSplit[1];
-              splits[0] = new JdbcInputSplit(FileInputFormat.getInputPaths(job)[0]);
-              return splits;
-            }
-            intervals.get(0).setLeft(null);
-            intervals.get(intervals.size()-1).setRight(null);
-            splits = new InputSplit[intervals.size()];
-            for (int i = 0; i < intervals.size(); i++) {
-              splits[i] = new JdbcInputSplit(partitionColumn, intervals.get(i).getLeft(), intervals.get(i).getRight(), tablePaths[0]);
-            }
-          } else {
-            int numRecords = dbAccessor.getTotalNumberOfRecords(job);
-
-            if (numRecords < numPartitions) {
-              numPartitions = numRecords;
-            }
-
-            int numRecordsPerSplit = numRecords / numPartitions;
-            int numSplitsWithExtraRecords = numRecords % numPartitions;
-
-            LOGGER.debug("Num records = {}", numRecords);
-            splits = new InputSplit[numPartitions];
-
-            int offset = 0;
-            for (int i = 0; i < numPartitions; i++) {
-              int numRecordsInThisSplit = numRecordsPerSplit;
-              if (i < numSplitsWithExtraRecords) {
-                numRecordsInThisSplit++;
-              }
-
-              splits[i] = new JdbcInputSplit(numRecordsInThisSplit, offset, tablePaths[0]);
-              offset += numRecordsInThisSplit;
-            }
-          }
-
-          dbAccessor = null;
-          LOGGER.info("Num input splits created {}", splits.length);
-          for (InputSplit split : splits) {
-            LOGGER.info("split:" + split.toString());
-          }
-          return splits;
-        }
-        catch (Exception e) {
-          LOGGER.error("Error while splitting input data.", e);
-          throw new IOException(e);
-        }
-      }
-
-
-      /**
-       * For testing purposes only
-       *
-       * @param dbAccessor
-       *            DatabaseAccessor object
-       */
-      public void setDbAccessor(DatabaseAccessor dbAccessor) {
-        this.dbAccessor = dbAccessor;
-      }
-    }).getClass();
-//    return JdbcInputFormat.class;
+//    return (new HiveInputFormat<LongWritable, JdbcWritable> (){
+//      private DatabaseAccessor dbAccessor = null;
+//
+//      /**
+//       * {@inheritDoc}
+//       */
+//      @Override
+//      public RecordReader<LongWritable, JdbcWritable>
+//      getRecordReader(InputSplit split, JobConf job, Reporter reporter) throws IOException {
+//
+//        if (!(split instanceof JdbcInputSplit)) {
+//          throw new RuntimeException("Incompatible split type " + split.getClass().getName() + ".");
+//        }
+//
+//        return new JdbcRecordReader(job, (JdbcInputSplit) split);
+//      }
+//
+//
+//      /**
+//       * {@inheritDoc}
+//       */
+//      @Override
+//      public InputSplit[] getSplits(JobConf job, int numSplits) throws IOException {
+//        try {
+//
+//          String partitionColumn = job.get(org.apache.hive.storage.jdbc.conf.config.Constants.JDBC_PARTITION_COLUMN);
+//          int numPartitions = job.getInt(org.apache.hive.storage.jdbc.conf.config.Constants.JDBC_NUM_PARTITIONS, -1);
+//          String lowerBound = job.get(org.apache.hive.storage.jdbc.conf.config.Constants.JDBC_LOW_BOUND);
+//          String upperBound = job.get(org.apache.hive.storage.jdbc.conf.config.Constants.JDBC_UPPER_BOUND);
+//
+//          InputSplit[] splits;
+//
+//          if (!job.getBoolean(org.apache.hive.storage.jdbc.conf.config.Constants.JDBC_SPLIT_QUERY, true) || numPartitions <= 1) {
+//            // We will not split this query if:
+//            // 1. hive.sql.query.split is set to false (either manually or automatically by calcite
+//            // 2. numPartitions == 1
+//            splits = new InputSplit[1];
+//            splits[0] = new JdbcInputSplit(FileInputFormat.getInputPaths(job)[0]);
+//            LOGGER.info("Creating 1 input split " + splits[0]);
+//            return splits;
+//          }
+//
+//          dbAccessor = DatabaseAccessorFactory.getAccessor(job);
+//          Path[] tablePaths = FileInputFormat.getInputPaths(job);
+//
+//          // We will split this query into n splits
+//          LOGGER.debug("Creating {} input splits", numPartitions);
+//
+//          if (partitionColumn != null) {
+//            List<String> columnNames = dbAccessor.getColumnNames(job);
+//            if (!columnNames.contains(partitionColumn)) {
+//              throw new IOException("Cannot find partitionColumn:" + partitionColumn + " in " + columnNames);
+//            }
+//            List<TypeInfo> hiveColumnTypesList = TypeInfoUtils.getTypeInfosFromTypeString(job.get(serdeConstants.LIST_COLUMN_TYPES));
+//            TypeInfo typeInfo = hiveColumnTypesList.get(columnNames.indexOf(partitionColumn));
+//            if (!(typeInfo instanceof PrimitiveTypeInfo)) {
+//              throw new IOException(partitionColumn + " is a complex type, only primitive type can be a partition column");
+//            }
+//            if (lowerBound == null || upperBound == null) {
+//              Pair<String, String> boundary = dbAccessor.getBounds(job, partitionColumn, lowerBound == null,
+//                      upperBound == null);
+//              if (lowerBound == null) {
+//                lowerBound = boundary.getLeft();
+//              }
+//              if (upperBound == null) {
+//                upperBound = boundary.getRight();
+//              }
+//            }
+//            if (lowerBound == null) {
+//              throw new IOException("lowerBound of " + partitionColumn + " cannot be null");
+//            }
+//            if (upperBound == null) {
+//              throw new IOException("upperBound of " + partitionColumn + " cannot be null");
+//            }
+//            IntervalSplitter intervalSplitter = IntervalSplitterFactory.newIntervalSpitter(typeInfo);
+//            List<MutablePair<String, String>> intervals = intervalSplitter.getIntervals(lowerBound, upperBound, numPartitions,
+//                    typeInfo);
+//            if (intervals.size()<=1) {
+//              LOGGER.debug("Creating 1 input splits");
+//              splits = new InputSplit[1];
+//              splits[0] = new JdbcInputSplit(FileInputFormat.getInputPaths(job)[0]);
+//              return splits;
+//            }
+//            intervals.get(0).setLeft(null);
+//            intervals.get(intervals.size()-1).setRight(null);
+//            splits = new InputSplit[intervals.size()];
+//            for (int i = 0; i < intervals.size(); i++) {
+//              splits[i] = new JdbcInputSplit(partitionColumn, intervals.get(i).getLeft(), intervals.get(i).getRight(), tablePaths[0]);
+//            }
+//          } else {
+//            int numRecords = dbAccessor.getTotalNumberOfRecords(job);
+//
+//            if (numRecords < numPartitions) {
+//              numPartitions = numRecords;
+//            }
+//
+//            int numRecordsPerSplit = numRecords / numPartitions;
+//            int numSplitsWithExtraRecords = numRecords % numPartitions;
+//
+//            LOGGER.debug("Num records = {}", numRecords);
+//            splits = new InputSplit[numPartitions];
+//
+//            int offset = 0;
+//            for (int i = 0; i < numPartitions; i++) {
+//              int numRecordsInThisSplit = numRecordsPerSplit;
+//              if (i < numSplitsWithExtraRecords) {
+//                numRecordsInThisSplit++;
+//              }
+//
+//              splits[i] = new JdbcInputSplit(numRecordsInThisSplit, offset, tablePaths[0]);
+//              offset += numRecordsInThisSplit;
+//            }
+//          }
+//
+//          dbAccessor = null;
+//          LOGGER.info("Num input splits created {}", splits.length);
+//          for (InputSplit split : splits) {
+//            LOGGER.info("split:" + split.toString());
+//          }
+//          return splits;
+//        }
+//        catch (Exception e) {
+//          LOGGER.error("Error while splitting input data.", e);
+//          throw new IOException(e);
+//        }
+//      }
+//
+//
+//      /**
+//       * For testing purposes only
+//       *
+//       * @param dbAccessor
+//       *            DatabaseAccessor object
+//       */
+//      public void setDbAccessor(DatabaseAccessor dbAccessor) {
+//        this.dbAccessor = dbAccessor;
+//      }
+//    }).getClass();
+    return org.apache.hive.storage.jdbc.format.JdbcInputFormat.class;
   }
 
 
   @SuppressWarnings("rawtypes")
   @Override
   public Class<? extends OutputFormat> getOutputFormatClass() {
-    return JdbcOutputFormat.class;
+    return org.apache.hive.storage.jdbc.format.JdbcOutputFormat.class;
   }
 
 
@@ -283,6 +264,7 @@ public class JdbcTextHandler implements HiveStorageHandler {
 
   @Override
   public HiveAuthorizationProvider getAuthorizationProvider() throws HiveException {
+
     return null;
   }
 
@@ -290,7 +272,7 @@ public class JdbcTextHandler implements HiveStorageHandler {
   public void configureJobConf(TableDesc tableDesc, JobConf jobConf) {
 
     List<Class<?>> classesToLoad = new ArrayList<>();
-    classesToLoad.add(org.apache.hive.storage.jdbc.JdbcInputSplit.class);
+    classesToLoad.add(JdbcInputSplit.class);
     classesToLoad.add(org.apache.commons.dbcp2.BasicDataSourceFactory.class);
     classesToLoad.add(org.apache.commons.pool2.impl.GenericObjectPool.class);
     // Adding mysql jdbc driver if exists
@@ -328,192 +310,192 @@ public class JdbcTextHandler implements HiveStorageHandler {
   }
 
 
-  public class JdbcInputFormat extends HiveInputFormat<LongWritable, JdbcWritable> {
-
-    private DatabaseAccessor dbAccessor = null;
-
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public RecordReader<LongWritable, JdbcWritable>
-    getRecordReader(InputSplit split, JobConf job, Reporter reporter) throws IOException {
-
-      if (!(split instanceof JdbcInputSplit)) {
-        throw new RuntimeException("Incompatible split type " + split.getClass().getName() + ".");
-      }
-
-      return new JdbcRecordReader(job, (JdbcInputSplit) split);
-    }
-
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public InputSplit[] getSplits(JobConf job, int numSplits) throws IOException {
-      try {
-
-        String partitionColumn = job.get(org.apache.hive.storage.jdbc.conf.Constants.JDBC_PARTITION_COLUMN);
-        int numPartitions = job.getInt(org.apache.hive.storage.jdbc.conf.Constants.JDBC_NUM_PARTITIONS, -1);
-        String lowerBound = job.get(org.apache.hive.storage.jdbc.conf.Constants.JDBC_LOW_BOUND);
-        String upperBound = job.get(org.apache.hive.storage.jdbc.conf.Constants.JDBC_UPPER_BOUND);
-
-        InputSplit[] splits;
-
-        if (!job.getBoolean(org.apache.hive.storage.jdbc.conf.Constants.JDBC_SPLIT_QUERY, true) || numPartitions <= 1) {
-          // We will not split this query if:
-          // 1. hive.sql.query.split is set to false (either manually or automatically by calcite
-          // 2. numPartitions == 1
-          splits = new InputSplit[1];
-          splits[0] = new JdbcInputSplit(FileInputFormat.getInputPaths(job)[0]);
-          LOGGER.info("Creating 1 input split " + splits[0]);
-          return splits;
-        }
-
-        dbAccessor = DatabaseAccessorFactory.getAccessor(job);
-        Path[] tablePaths = FileInputFormat.getInputPaths(job);
-
-        // We will split this query into n splits
-        LOGGER.debug("Creating {} input splits", numPartitions);
-
-        if (partitionColumn != null) {
-          List<String> columnNames = dbAccessor.getColumnNames(job);
-          if (!columnNames.contains(partitionColumn)) {
-            throw new IOException("Cannot find partitionColumn:" + partitionColumn + " in " + columnNames);
-          }
-          List<TypeInfo> hiveColumnTypesList = TypeInfoUtils.getTypeInfosFromTypeString(job.get(serdeConstants.LIST_COLUMN_TYPES));
-          TypeInfo typeInfo = hiveColumnTypesList.get(columnNames.indexOf(partitionColumn));
-          if (!(typeInfo instanceof PrimitiveTypeInfo)) {
-            throw new IOException(partitionColumn + " is a complex type, only primitive type can be a partition column");
-          }
-          if (lowerBound == null || upperBound == null) {
-            Pair<String, String> boundary = dbAccessor.getBounds(job, partitionColumn, lowerBound == null,
-                    upperBound == null);
-            if (lowerBound == null) {
-              lowerBound = boundary.getLeft();
-            }
-            if (upperBound == null) {
-              upperBound = boundary.getRight();
-            }
-          }
-          if (lowerBound == null) {
-            throw new IOException("lowerBound of " + partitionColumn + " cannot be null");
-          }
-          if (upperBound == null) {
-            throw new IOException("upperBound of " + partitionColumn + " cannot be null");
-          }
-          IntervalSplitter intervalSplitter = IntervalSplitterFactory.newIntervalSpitter(typeInfo);
-          List<MutablePair<String, String>> intervals = intervalSplitter.getIntervals(lowerBound, upperBound, numPartitions,
-                  typeInfo);
-          if (intervals.size()<=1) {
-            LOGGER.debug("Creating 1 input splits");
-            splits = new InputSplit[1];
-            splits[0] = new JdbcInputSplit(FileInputFormat.getInputPaths(job)[0]);
-            return splits;
-          }
-          intervals.get(0).setLeft(null);
-          intervals.get(intervals.size()-1).setRight(null);
-          splits = new InputSplit[intervals.size()];
-          for (int i = 0; i < intervals.size(); i++) {
-            splits[i] = new JdbcInputSplit(partitionColumn, intervals.get(i).getLeft(), intervals.get(i).getRight(), tablePaths[0]);
-          }
-        } else {
-          int numRecords = dbAccessor.getTotalNumberOfRecords(job);
-
-          if (numRecords < numPartitions) {
-            numPartitions = numRecords;
-          }
-
-          int numRecordsPerSplit = numRecords / numPartitions;
-          int numSplitsWithExtraRecords = numRecords % numPartitions;
-
-          LOGGER.debug("Num records = {}", numRecords);
-          splits = new InputSplit[numPartitions];
-
-          int offset = 0;
-          for (int i = 0; i < numPartitions; i++) {
-            int numRecordsInThisSplit = numRecordsPerSplit;
-            if (i < numSplitsWithExtraRecords) {
-              numRecordsInThisSplit++;
-            }
-
-            splits[i] = new JdbcInputSplit(numRecordsInThisSplit, offset, tablePaths[0]);
-            offset += numRecordsInThisSplit;
-          }
-        }
-
-        dbAccessor = null;
-        LOGGER.info("Num input splits created {}", splits.length);
-        for (InputSplit split : splits) {
-          LOGGER.info("split:" + split.toString());
-        }
-        return splits;
-      }
-      catch (Exception e) {
-        LOGGER.error("Error while splitting input data.", e);
-        throw new IOException(e);
-      }
-    }
-
-
-    /**
-     * For testing purposes only
-     *
-     * @param dbAccessor
-     *            DatabaseAccessor object
-     */
-    public void setDbAccessor(DatabaseAccessor dbAccessor) {
-      this.dbAccessor = dbAccessor;
-    }
-
-  }
-
-  public class JdbcOutputFormat extends FileOutputFormat<NullWritable, JdbcWritable> implements OutputFormat<NullWritable, JdbcWritable>,
-          HiveOutputFormat<NullWritable, JdbcWritable> {
-
-    /**
-     * {@inheritDoc}
-     */
-    // TODO: Implement giving hdfs file sink.
-
-    @Override
-    public FileSinkOperator.RecordWriter getHiveRecordWriter(JobConf jc,
-                                                             Path finalOutPath,
-                                                             Class<? extends Writable> valueClass,
-                                                             boolean isCompressed,
-                                                             Properties tableProperties,
-                                                             Progressable progress) throws IOException {
-      FileSystem fs = finalOutPath.getFileSystem(jc);
-      String dbTable = jc.get(JDBC_TABLE);
-      return new JdbcWriter(jc,fs, dbTable, finalOutPath, progress);
-//    throw new UnsupportedOperationException("Write operations are not allowed.");
-    }
-
-
-    /**
-     * {@inheritDoc}
-     * @return
-     */
-
-
-    @Override
-    public org.apache.hadoop.mapred.RecordWriter<NullWritable, JdbcWritable> getRecordWriter(FileSystem fileSystem, JobConf jc, String s, Progressable progressable) throws IOException {
-      String dbTable = jc.get(JDBC_TABLE);
-      Path file = FileOutputFormat.getTaskOutputPath(jc, s);
-      return new JdbcWriter(jc, fileSystem,dbTable,file , progressable );
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void checkOutputSpecs(FileSystem ignored, JobConf job) throws IOException {
-      // do nothing
-    }
-
-  }
-
+//  public class JdbcInputFormat extends HiveInputFormat<LongWritable, JdbcWritable> {
+//
+//    private DatabaseAccessor dbAccessor = null;
+//
+//
+//    /**
+//     * {@inheritDoc}
+//     */
+//    @Override
+//    public RecordReader<LongWritable, JdbcWritable>
+//    getRecordReader(InputSplit split, JobConf job, Reporter reporter) throws IOException {
+//
+//      if (!(split instanceof JdbcInputSplit)) {
+//        throw new RuntimeException("Incompatible split type " + split.getClass().getName() + ".");
+//      }
+//
+//      return new JdbcRecordReader(job, (JdbcInputSplit) split);
+//    }
+//
+//
+//    /**
+//     * {@inheritDoc}
+//     */
+//    @Override
+//    public InputSplit[] getSplits(JobConf job, int numSplits) throws IOException {
+//      try {
+//
+//        String partitionColumn = job.get(org.apache.hive.storage.jdbc.conf.config.Constants.JDBC_PARTITION_COLUMN);
+//        int numPartitions = job.getInt(org.apache.hive.storage.jdbc.conf.config.Constants.JDBC_NUM_PARTITIONS, -1);
+//        String lowerBound = job.get(org.apache.hive.storage.jdbc.conf.config.Constants.JDBC_LOW_BOUND);
+//        String upperBound = job.get(org.apache.hive.storage.jdbc.conf.config.Constants.JDBC_UPPER_BOUND);
+//
+//        InputSplit[] splits;
+//
+//        if (!job.getBoolean(org.apache.hive.storage.jdbc.conf.config.Constants.JDBC_SPLIT_QUERY, true) || numPartitions <= 1) {
+//          // We will not split this query if:
+//          // 1. hive.sql.query.split is set to false (either manually or automatically by calcite
+//          // 2. numPartitions == 1
+//          splits = new InputSplit[1];
+//          splits[0] = new JdbcInputSplit(FileInputFormat.getInputPaths(job)[0]);
+//          LOGGER.info("Creating 1 input split " + splits[0]);
+//          return splits;
+//        }
+//
+//        dbAccessor = DatabaseAccessorFactory.getAccessor(job);
+//        Path[] tablePaths = FileInputFormat.getInputPaths(job);
+//
+//        // We will split this query into n splits
+//        LOGGER.debug("Creating {} input splits", numPartitions);
+//
+//        if (partitionColumn != null) {
+//          List<String> columnNames = dbAccessor.getColumnNames(job);
+//          if (!columnNames.contains(partitionColumn)) {
+//            throw new IOException("Cannot find partitionColumn:" + partitionColumn + " in " + columnNames);
+//          }
+//          List<TypeInfo> hiveColumnTypesList = TypeInfoUtils.getTypeInfosFromTypeString(job.get(serdeConstants.LIST_COLUMN_TYPES));
+//          TypeInfo typeInfo = hiveColumnTypesList.get(columnNames.indexOf(partitionColumn));
+//          if (!(typeInfo instanceof PrimitiveTypeInfo)) {
+//            throw new IOException(partitionColumn + " is a complex type, only primitive type can be a partition column");
+//          }
+//          if (lowerBound == null || upperBound == null) {
+//            Pair<String, String> boundary = dbAccessor.getBounds(job, partitionColumn, lowerBound == null,
+//                    upperBound == null);
+//            if (lowerBound == null) {
+//              lowerBound = boundary.getLeft();
+//            }
+//            if (upperBound == null) {
+//              upperBound = boundary.getRight();
+//            }
+//          }
+//          if (lowerBound == null) {
+//            throw new IOException("lowerBound of " + partitionColumn + " cannot be null");
+//          }
+//          if (upperBound == null) {
+//            throw new IOException("upperBound of " + partitionColumn + " cannot be null");
+//          }
+//          IntervalSplitter intervalSplitter = IntervalSplitterFactory.newIntervalSpitter(typeInfo);
+//          List<MutablePair<String, String>> intervals = intervalSplitter.getIntervals(lowerBound, upperBound, numPartitions,
+//                  typeInfo);
+//          if (intervals.size()<=1) {
+//            LOGGER.debug("Creating 1 input splits");
+//            splits = new InputSplit[1];
+//            splits[0] = new JdbcInputSplit(FileInputFormat.getInputPaths(job)[0]);
+//            return splits;
+//          }
+//          intervals.get(0).setLeft(null);
+//          intervals.get(intervals.size()-1).setRight(null);
+//          splits = new InputSplit[intervals.size()];
+//          for (int i = 0; i < intervals.size(); i++) {
+//            splits[i] = new JdbcInputSplit(partitionColumn, intervals.get(i).getLeft(), intervals.get(i).getRight(), tablePaths[0]);
+//          }
+//        } else {
+//          int numRecords = dbAccessor.getTotalNumberOfRecords(job);
+//
+//          if (numRecords < numPartitions) {
+//            numPartitions = numRecords;
+//          }
+//
+//          int numRecordsPerSplit = numRecords / numPartitions;
+//          int numSplitsWithExtraRecords = numRecords % numPartitions;
+//
+//          LOGGER.debug("Num records = {}", numRecords);
+//          splits = new InputSplit[numPartitions];
+//
+//          int offset = 0;
+//          for (int i = 0; i < numPartitions; i++) {
+//            int numRecordsInThisSplit = numRecordsPerSplit;
+//            if (i < numSplitsWithExtraRecords) {
+//              numRecordsInThisSplit++;
+//            }
+//
+//            splits[i] = new JdbcInputSplit(numRecordsInThisSplit, offset, tablePaths[0]);
+//            offset += numRecordsInThisSplit;
+//          }
+//        }
+//
+//        dbAccessor = null;
+//        LOGGER.info("Num input splits created {}", splits.length);
+//        for (InputSplit split : splits) {
+//          LOGGER.info("split:" + split.toString());
+//        }
+//        return splits;
+//      }
+//      catch (Exception e) {
+//        LOGGER.error("Error while splitting input data.", e);
+//        throw new IOException(e);
+//      }
+//    }
+//
+//
+//    /**
+//     * For testing purposes only
+//     *
+//     * @param dbAccessor
+//     *            DatabaseAccessor object
+//     */
+//    public void setDbAccessor(DatabaseAccessor dbAccessor) {
+//      this.dbAccessor = dbAccessor;
+//    }
+//
+//  }
+//
+//  public class JdbcOutputFormat extends FileOutputFormat<NullWritable, JdbcWritable> implements OutputFormat<NullWritable, JdbcWritable>,
+//          HiveOutputFormat<NullWritable, JdbcWritable> {
+//
+//    /**
+//     * {@inheritDoc}
+//     */
+//    // TODO: Implement giving hdfs file sink.
+//
+//    @Override
+//    public FileSinkOperator.RecordWriter getHiveRecordWriter(JobConf jc,
+//                                                             Path finalOutPath,
+//                                                             Class<? extends Writable> valueClass,
+//                                                             boolean isCompressed,
+//                                                             Properties tableProperties,
+//                                                             Progressable progress) throws IOException {
+//      FileSystem fs = finalOutPath.getFileSystem(jc);
+//      String dbTable = jc.get(JDBC_TABLE);
+//      return new JdbcWriter(jc,fs, dbTable, finalOutPath, progress);
+////    throw new UnsupportedOperationException("Write operations are not allowed.");
+//    }
+//
+//
+//    /**
+//     * {@inheritDoc}
+//     * @return
+//     */
+//
+//
+//    @Override
+//    public org.apache.hadoop.mapred.RecordWriter<NullWritable, JdbcWritable> getRecordWriter(FileSystem fileSystem, JobConf jc, String s, Progressable progressable) throws IOException {
+//      String dbTable = jc.get(JDBC_TABLE);
+//      Path file = FileOutputFormat.getTaskOutputPath(jc, s);
+//      return new JdbcWriter(jc, fileSystem,dbTable,file , progressable );
+//    }
+//
+//    /**
+//     * {@inheritDoc}
+//     */
+//    @Override
+//    public void checkOutputSpecs(FileSystem ignored, JobConf job) throws IOException {
+//      // do nothing
+//    }
+//
+//  }
+//
 
 }

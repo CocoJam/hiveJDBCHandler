@@ -16,8 +16,11 @@ package org.apache.hive.storage.jdbc.dao;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.serde.serdeConstants;
-import org.apache.hive.storage.jdbc.conf.JdbcStorageConfig;
-import org.apache.hive.storage.jdbc.exception.HiveJdbcDatabaseAccessException;
+import org.apache.hive.storage.jdbc.conf.config.JdbcStorageConfig;
+import org.apache.hive.storage.jdbc.dao.dataBase.DatabaseAccessor;
+import org.apache.hive.storage.jdbc.dao.dataBase.DatabaseAccessorFactory;
+import org.apache.hive.storage.jdbc.dao.dataBase.JdbcRecordIterator;
+import org.apache.hive.storage.jdbc.exception.hive.HiveJdbcDatabaseAccessException;
 import org.junit.Test;
 
 import java.util.List;

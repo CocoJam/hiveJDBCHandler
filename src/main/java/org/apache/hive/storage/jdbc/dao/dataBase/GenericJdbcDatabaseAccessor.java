@@ -25,7 +25,7 @@ import org.slf4j.LoggerFactory;
 
 import org.apache.hive.storage.jdbc.conf.config.JdbcStorageConfig;
 import org.apache.hive.storage.jdbc.conf.config.JdbcStorageConfigManager;
-import org.apache.hive.storage.jdbc.exception.hive.HiveJdbcDatabaseAccessException;
+import org.apache.hive.storage.jdbc.exception.HiveJdbcDatabaseAccessException;
 import static org.apache.hive.storage.jdbc.conf.config.Constants.*;
 import javax.sql.DataSource;
 

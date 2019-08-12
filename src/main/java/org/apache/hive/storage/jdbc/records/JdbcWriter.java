@@ -20,9 +20,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 
-public class JdbcWriter implements org.apache.hadoop.mapred.lib.db.DBWritable,
-        org.apache.hadoop.mapreduce.lib.db.DBWritable
-//        FileSinkOperator.RecordWriter, RecordWriter<NullWritable, MapWritable>
+public class JdbcWriter implements
+        FileSinkOperator.RecordWriter, RecordWriter<NullWritable, MapWritable>
 {
     private String dBTable;
     private FileSystem fs;
@@ -44,39 +43,31 @@ public class JdbcWriter implements org.apache.hadoop.mapred.lib.db.DBWritable,
     }
 
 
-//    @Override
-//    public void write(Writable w) throws IOException {
-//        if (w instanceof Text) {
-//            Text tr = (Text)w;
-//            this.outputStream.write(tr.getBytes(), 0, tr.getLength());
-//        } else {
-//            BytesWritable bw = (BytesWritable)w;
-//            this.outputStream.write(w.toString().getBytes(StandardCharsets.UTF_8));
-//        }
-//    }
-//
-//    @Override
-//    public void close(boolean abort) throws IOException {
-//        return;
-//    }
-//
-//    @Override
-//    public synchronized void write(NullWritable nullWritable, MapWritable mapWritable) throws IOException {
-//        write(mapWritable);
-//    }
-//
-//    @Override
-//    public void close(Reporter reporter) throws IOException {
-//        close(false);
-//    }
-
     @Override
-    public void write(PreparedStatement preparedStatement) throws SQLException {
-
+    public void write(Writable w) throws IOException {
+        if (w instanceof Text) {
+            Text tr = (Text)w;
+            this.outputStream.write(tr.getBytes(), 0, tr.getLength());
+        } else {
+            BytesWritable bw = (BytesWritable)w;
+            this.outputStream.write(w.toString().getBytes(StandardCharsets.UTF_8));
+        }
     }
 
     @Override
-    public void readFields(ResultSet resultSet) throws SQLException {
-
+    public void close(boolean abort) throws IOException {
+        return;
     }
+
+    @Override
+    public synchronized void write(NullWritable nullWritable, MapWritable mapWritable) throws IOException {
+        write(mapWritable);
+    }
+
+    @Override
+    public void close(Reporter reporter) throws IOException {
+        close(false);
+    }
+
+
 }

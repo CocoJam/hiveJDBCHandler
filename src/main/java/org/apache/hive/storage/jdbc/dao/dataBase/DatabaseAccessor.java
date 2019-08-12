@@ -17,7 +17,7 @@ package org.apache.hive.storage.jdbc.dao.dataBase;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 
-import org.apache.hive.storage.jdbc.exception.hive.HiveJdbcDatabaseAccessException;
+import org.apache.hive.storage.jdbc.exception.HiveJdbcDatabaseAccessException;
 
 import java.util.List;
 

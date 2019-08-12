@@ -22,7 +22,7 @@ import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hive.storage.jdbc.dao.dataBase.DatabaseAccessor;
 import org.apache.hive.storage.jdbc.dao.dataBase.DatabaseAccessorFactory;
-import org.apache.hive.storage.jdbc.exception.hive.HiveJdbcDatabaseAccessException;
+import org.apache.hive.storage.jdbc.exception.HiveJdbcDatabaseAccessException;
 import org.apache.hive.storage.jdbc.format.JdbcInputFormat;
 import org.apache.hive.storage.jdbc.split.JdbcInputSplit;
 import org.junit.Test;

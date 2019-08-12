@@ -60,7 +60,7 @@ public class JdbcSerDe extends AbstractSerDe {
   private PrimitiveTypeInfo[] hiveColumnTypes;
   private ObjectInspector inspector;
   private List<Object> row;
-
+  private JdbcSerializer serializer;
 
   /*
    * This method gets called multiple times by Hive. On some invocations, the properties will be empty.
@@ -125,6 +125,7 @@ public class JdbcSerDe extends AbstractSerDe {
             ObjectInspectorFactory.getStandardStructObjectInspector(Arrays.asList(hiveColumnNames),
                 fieldInspectors);
         row = new ArrayList<>(hiveColumnNames.length);
+        serializer = new JdbcSerializer(hiveColumnNames,hiveColumnTypes,row);
       }
     }
     catch (Exception e) {
@@ -256,7 +257,13 @@ public class JdbcSerDe extends AbstractSerDe {
 
   @Override
   public Writable serialize(Object obj, ObjectInspector objInspector) throws SerDeException {
-    throw new UnsupportedOperationException("Writes are not allowed");
+    try {
+      return serializer.serialize(obj, objInspector);
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+    return null;
+//    throw new UnsupportedOperationException("Writes are not allowed");
   }
 
 

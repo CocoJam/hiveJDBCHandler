@@ -29,7 +29,7 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.Map.Entry;
 
-public class JdbcRecordReader implements RecordReader<LongWritable, MapWritable> {
+public class JdbcRecordReader implements RecordReader<LongWritable, JdbcWritable> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(JdbcRecordReader.class);
   private DatabaseAccessor dbAccessor = null;
@@ -47,7 +47,7 @@ public class JdbcRecordReader implements RecordReader<LongWritable, MapWritable>
 
 
   @Override
-  public boolean next(LongWritable key, MapWritable value) throws IOException {
+  public boolean next(LongWritable key, JdbcWritable value) throws IOException {
     try {
       LOGGER.trace("JdbcRecordReader.next called");
       if (dbAccessor == null) {
@@ -91,8 +91,8 @@ public class JdbcRecordReader implements RecordReader<LongWritable, MapWritable>
 
 
   @Override
-  public MapWritable createValue() {
-    return new MapWritable();
+  public JdbcWritable createValue() {
+    return new JdbcWritable();
   }
 
 

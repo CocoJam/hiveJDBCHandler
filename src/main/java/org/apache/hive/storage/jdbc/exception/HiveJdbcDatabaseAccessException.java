@@ -12,29 +12,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hive.storage.jdbc.exception.hive;
+package org.apache.hive.storage.jdbc.exception;
 
-public class HiveJdbcStorageException extends Exception {
+public class HiveJdbcDatabaseAccessException extends HiveJdbcStorageException {
 
-  private static final long serialVersionUID = 4858210651037826401L;
+  private static final long serialVersionUID = -4106595742876276803L;
 
 
-  public HiveJdbcStorageException() {
+  public HiveJdbcDatabaseAccessException() {
     super();
   }
 
 
-  public HiveJdbcStorageException(String message) {
+  public HiveJdbcDatabaseAccessException(String message, Throwable cause) {
+    super(message, cause);
+  }
+
+
+  public HiveJdbcDatabaseAccessException(String message) {
     super(message);
   }
 
 
-  public HiveJdbcStorageException(Throwable cause) {
+  public HiveJdbcDatabaseAccessException(Throwable cause) {
     super(cause);
   }
 
-
-  public HiveJdbcStorageException(String message, Throwable cause) {
-    super(message, cause);
-  }
 }

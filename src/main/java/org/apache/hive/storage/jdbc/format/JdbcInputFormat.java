@@ -38,11 +38,11 @@ public class JdbcInputFormat extends HiveInputFormat<LongWritable, JdbcWritable>
   @Override
   public RecordReader<LongWritable, JdbcWritable>
     getRecordReader(InputSplit split, JobConf job, Reporter reporter) throws IOException {
-
+    LOGGER.warn("get RecordReader");
     if (!(split instanceof JdbcInputSplit)) {
       throw new RuntimeException("Incompatible split type " + split.getClass().getName() + ".");
     }
-
+    LOGGER.warn("get return RecordReader");
     return new JdbcRecordReader(job, (JdbcInputSplit) split);
   }
 

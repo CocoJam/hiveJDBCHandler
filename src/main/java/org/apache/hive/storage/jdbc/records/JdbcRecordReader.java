@@ -49,7 +49,7 @@ public class JdbcRecordReader implements RecordReader<LongWritable, JdbcWritable
   @Override
   public boolean next(LongWritable key, JdbcWritable value) throws IOException {
     try {
-      LOGGER.trace("JdbcRecordReader.next called");
+      LOGGER.warn("JdbcRecordReader.next called");
       if (dbAccessor == null) {
         dbAccessor = DatabaseAccessorFactory.getAccessor(conf);
         iterator = dbAccessor.getRecordIterator(conf, split.getPartitionColumn(), split.getLowerBound(), split
@@ -57,7 +57,7 @@ public class JdbcRecordReader implements RecordReader<LongWritable, JdbcWritable
       }
 
       if (iterator.hasNext()) {
-        LOGGER.trace("JdbcRecordReader has more records to read.");
+        LOGGER.warn("JdbcRecordReader has more records to read.");
         key.set(pos);
         pos++;
         Map<String, Object> record = iterator.next();
@@ -69,12 +69,12 @@ public class JdbcRecordReader implements RecordReader<LongWritable, JdbcWritable
           return true;
         }
         else {
-          LOGGER.debug("JdbcRecordReader got null record.");
+          LOGGER.warn("JdbcRecordReader got null record.");
           return false;
         }
       }
       else {
-        LOGGER.debug("JdbcRecordReader has no more records to read.");
+        LOGGER.warn("JdbcRecordReader has no more records to read.");
         return false;
       }
     }

@@ -51,7 +51,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
-
+import  org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat;
 public class JdbcSerDe extends AbstractSerDe {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(JdbcSerDe.class);

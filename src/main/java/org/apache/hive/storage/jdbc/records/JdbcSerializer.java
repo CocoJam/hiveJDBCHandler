@@ -11,10 +11,13 @@ import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.apache.hadoop.io.Writable;
 import org.apache.hive.storage.jdbc.records.*;
 import org.apache.hive.storage.jdbc.util.HiveJdbcBridgeUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
 public class JdbcSerializer {
+    private static final Logger LOGGER = LoggerFactory.getLogger(JdbcSerializer.class);
     private String[] hiveColumnNames;
     private PrimitiveTypeInfo[] hiveColumnTypes;
     private List<Object> row;
@@ -45,6 +48,7 @@ public class JdbcSerializer {
                     fieldOI);
             jdbcWritable.set(i, javaObject);
         }
+        LOGGER.warn("serializer serialize");
         return jdbcWritable;
     }
 }

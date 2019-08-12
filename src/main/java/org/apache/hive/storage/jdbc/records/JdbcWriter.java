@@ -9,6 +9,9 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.RecordWriter;
 import org.apache.hadoop.mapred.Reporter;
 import org.apache.hadoop.util.Progressable;
+import org.apache.hive.storage.jdbc.dao.dataBase.JdbcRecordIterator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -21,8 +24,9 @@ import java.util.Map;
 
 
 public class JdbcWriter implements
-        FileSinkOperator.RecordWriter, RecordWriter<NullWritable, MapWritable>
+        FileSinkOperator.RecordWriter, RecordWriter<NullWritable, JdbcWritable>
 {
+    private static final Logger LOGGER = LoggerFactory.getLogger(JdbcWriter.class);
     private String dBTable;
     private FileSystem fs;
     private JobConf jc;
@@ -45,12 +49,16 @@ public class JdbcWriter implements
 
     @Override
     public void write(Writable w) throws IOException {
+
         if (w instanceof Text) {
             Text tr = (Text)w;
             this.outputStream.write(tr.getBytes(), 0, tr.getLength());
+            LOGGER.warn("JdbcWriter by output stream "+ tr.getLength());
+            LOGGER.warn("JdbcWriter by output stream "+ tr.toString());
         } else {
             BytesWritable bw = (BytesWritable)w;
-            this.outputStream.write(w.toString().getBytes(StandardCharsets.UTF_8));
+            this.outputStream.write(bw.get(), 0, bw.getLength());
+            LOGGER.warn("JdbcWriter by output stream by bw "+ bw.getLength());
         }
     }
 
@@ -60,7 +68,8 @@ public class JdbcWriter implements
     }
 
     @Override
-    public synchronized void write(NullWritable nullWritable, MapWritable mapWritable) throws IOException {
+    public void write(NullWritable nullWritable, JdbcWritable mapWritable) throws IOException {
+        LOGGER.warn("JdbcWriter routing");
         write(mapWritable);
     }
 

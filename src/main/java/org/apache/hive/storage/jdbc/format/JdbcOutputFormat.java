@@ -25,16 +25,19 @@ import org.apache.hadoop.mapred.FileOutputFormat;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.OutputFormat;
 import org.apache.hadoop.util.Progressable;
+import org.apache.hive.storage.jdbc.records.JdbcWritable;
 import org.apache.hive.storage.jdbc.records.JdbcWriter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Properties;
 
 import static org.apache.hive.storage.jdbc.conf.config.Constants.*;
 
-public class JdbcOutputFormat extends FileOutputFormat<NullWritable, MapWritable> implements OutputFormat<NullWritable, MapWritable>,
-                                         HiveOutputFormat<NullWritable, MapWritable> {
-
+public class JdbcOutputFormat extends FileOutputFormat<NullWritable, JdbcWritable> implements OutputFormat<NullWritable, JdbcWritable>,
+                                         HiveOutputFormat<NullWritable, JdbcWritable> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(JdbcOutputFormat.class);
   /**
    * {@inheritDoc}
    */
@@ -47,8 +50,10 @@ public class JdbcOutputFormat extends FileOutputFormat<NullWritable, MapWritable
       boolean isCompressed,
       Properties tableProperties,
       Progressable progress) throws IOException {
+      LOGGER.warn("get HIVE Record Writer");
       FileSystem fs = finalOutPath.getFileSystem(jc);
       String dbTable = jc.get(JDBC_TABLE);
+
       return new JdbcWriter(jc,fs, dbTable, finalOutPath, progress);
 //    throw new UnsupportedOperationException("Write operations are not allowed.");
   }
@@ -61,9 +66,11 @@ public class JdbcOutputFormat extends FileOutputFormat<NullWritable, MapWritable
 
 
   @Override
-  public org.apache.hadoop.mapred.RecordWriter<NullWritable, MapWritable> getRecordWriter(FileSystem fileSystem, JobConf jc, String s, Progressable progressable) throws IOException {
+  public org.apache.hadoop.mapred.RecordWriter<NullWritable, JdbcWritable> getRecordWriter(FileSystem fileSystem, JobConf jc, String s, Progressable progressable) throws IOException {
     String dbTable = jc.get(JDBC_TABLE);
     Path file = FileOutputFormat.getTaskOutputPath(jc, s);
+    LOGGER.warn("get HIVE Record Writer Returning mapred RecordWriter");
+
     return new JdbcWriter(jc, fileSystem,dbTable,file , progressable );
   }
 
@@ -73,6 +80,7 @@ public class JdbcOutputFormat extends FileOutputFormat<NullWritable, MapWritable
   @Override
   public void checkOutputSpecs(FileSystem ignored, JobConf job) throws IOException {
     // do nothing
+    LOGGER.warn("checkOutputSpecs");
   }
 
 }

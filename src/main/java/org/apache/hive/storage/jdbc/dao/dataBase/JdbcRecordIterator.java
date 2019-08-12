@@ -24,10 +24,7 @@ import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLDataException;
+import java.sql.*;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -45,6 +42,7 @@ public class JdbcRecordIterator implements Iterator<Map<String, Object>> {
   private Connection conn;
   private PreparedStatement ps;
   private ResultSet rs;
+  private ResultSetMetaData meta;
   private String[] hiveColumnNames;
   List<TypeInfo> hiveColumnTypesList;
 
@@ -52,6 +50,11 @@ public class JdbcRecordIterator implements Iterator<Map<String, Object>> {
     this.conn = conn;
     this.ps = ps;
     this.rs = rs;
+    try {
+      meta = rs.getMetaData();
+    } catch (SQLException e) {
+      e.printStackTrace();
+    }
     String fieldNamesProperty;
     String fieldTypesProperty;
     if (conf.get(JDBC_TABLE) != null && conf.get(Constants.JDBC_QUERY) != null) {
@@ -81,9 +84,16 @@ public class JdbcRecordIterator implements Iterator<Map<String, Object>> {
   @Override
   public Map<String, Object> next() {
     try {
-      Map<String, Object> record = new HashMap<String, Object>(hiveColumnNames.length);
-      for (int i = 0; i < hiveColumnNames.length; i++) {
+//      LOGGER.warn("JdbcRecordITerator record Length  " + meta.getColumnCount());
+      Map<String, Object> record = new HashMap<String, Object>();
+
+      for (int i = 0; i < meta.getColumnCount(); i++) {
+        LOGGER.warn("JdbcRecordITerator hive I : " + i);
+
         String key = hiveColumnNames[i];
+        LOGGER.warn("JdbcRecordITerator hive Col names: " + hiveColumnNames[i]);
+        LOGGER.warn("JdbcRecordITerator hive Col type: " + ((PrimitiveTypeInfo) hiveColumnTypesList.get(i)).getPrimitiveCategory());
+//        LOGGER.warn("Meta data : " + meta.getColumnTypeName(i));
         Object value = null;
         if (!(hiveColumnTypesList.get(i) instanceof PrimitiveTypeInfo)) {
           throw new RuntimeException("date type of column " + hiveColumnNames[i] + ":" +
@@ -94,36 +104,36 @@ public class JdbcRecordIterator implements Iterator<Map<String, Object>> {
             case INT:
             case SHORT:
             case BYTE:
-              value = rs.getInt(i + 1);
+              value = rs.getInt(i+1);
               break;
             case LONG:
-              value = rs.getLong(i + 1);
+              value = rs.getLong(i+1);
               break;
             case FLOAT:
-              value = rs.getFloat(i + 1);
+              value = rs.getFloat(i+1);
               break;
             case DOUBLE:
-              value = rs.getDouble(i + 1);
+              value = rs.getDouble(i+1);
               break;
             case DECIMAL:
-              value = rs.getBigDecimal(i + 1);
+              value = rs.getBigDecimal(i+1);
               break;
             case BOOLEAN:
-              value = rs.getBoolean(i + 1);
+              value = rs.getBoolean(i+1);
               break;
             case CHAR:
             case VARCHAR:
             case STRING:
-              value = rs.getString(i + 1);
+              value = rs.getString(i);
               break;
             case DATE:
-              value = rs.getDate(i + 1);
+              value = rs.getDate(i);
               break;
             case TIMESTAMP:
-              value = rs.getTimestamp(i + 1);
+              value = rs.getTimestamp(i);
               break;
             default:
-              LOGGER.error("date type of column " + hiveColumnNames[i] + ":" +
+              LOGGER.warn("date type of column " + hiveColumnNames[i] + ":" +
                       ((PrimitiveTypeInfo) hiveColumnTypesList.get(i)).getPrimitiveCategory() +
                       " is not supported");
               value = null;
@@ -143,6 +153,7 @@ public class JdbcRecordIterator implements Iterator<Map<String, Object>> {
       return record;
     }
     catch (Exception e) {
+      LOGGER.warn("expection at : " + e.getStackTrace()[0].getLineNumber());
       LOGGER.warn("next() threw exception", e);
       return null;
     }

@@ -57,7 +57,7 @@ public class JdbcWriter implements
             LOGGER.warn("JdbcWriter by output stream "+ tr.toString());
         } else {
             BytesWritable bw = (BytesWritable)w;
-            this.outputStream.write(bw.get(), 0, bw.getLength());
+            this.outputStream.write(bw.getBytes(), 0, bw.getLength());
             LOGGER.warn("JdbcWriter by output stream by bw "+ bw.getLength());
         }
     }

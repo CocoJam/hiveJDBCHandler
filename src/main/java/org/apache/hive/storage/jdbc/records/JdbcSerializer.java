@@ -19,13 +19,11 @@ import java.util.List;
 public class JdbcSerializer {
     private static final Logger LOGGER = LoggerFactory.getLogger(JdbcSerializer.class);
     private String[] hiveColumnNames;
-    private PrimitiveTypeInfo[] hiveColumnTypes;
     private List<Object> row;
     private JdbcWritable jdbcWritable;
 //    private LazySimpleSerDe
-    public JdbcSerializer(String[] hiveColumnNames, PrimitiveTypeInfo[] hiveColumnTypes,List<Object> row) {
+    public JdbcSerializer(String[] hiveColumnNames,List<Object> row) {
         this.hiveColumnNames = hiveColumnNames;
-        this.hiveColumnTypes = hiveColumnTypes;
         this.row = row;
     }
 
@@ -38,7 +36,7 @@ public class JdbcSerializer {
         StructObjectInspector soi = (StructObjectInspector) objInspector;
         List<? extends StructField> fields = soi.getAllStructFieldRefs();
         List<Object> values = soi.getStructFieldsDataAsList(obj);
-        jdbcWritable = new JdbcWritable(hiveColumnTypes);
+        jdbcWritable = new JdbcWritable();
         for (int i = 0; i < hiveColumnNames.length; i++) {
             StructField structField = fields.get(i);
             Object field = soi.getStructFieldData(row,

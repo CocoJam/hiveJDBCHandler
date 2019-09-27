@@ -43,7 +43,7 @@ import org.apache.hive.storage.jdbc.dao.dataBase.DatabaseAccessor;
 import org.apache.hive.storage.jdbc.dao.dataBase.DatabaseAccessorFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.JavaDateObjectInspector;
 import org.apache.hive.storage.jdbc.conf.config.JdbcStorageConfig;
 
 import java.math.BigDecimal;
@@ -52,6 +52,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 import  org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat;
+import org.apache.hadoop.hive.ql.metadata.HiveException;
 public class JdbcSerDe extends AbstractSerDe {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(JdbcSerDe.class);
@@ -71,7 +72,7 @@ public class JdbcSerDe extends AbstractSerDe {
   @Override
   public void initialize(Configuration conf, Properties properties) throws SerDeException {
     try {
-      LOGGER.trace("Initializing the JdbcSerDe");
+      LOGGER.warn("Initializing the JdbcSerDe");
 
       if (properties.containsKey(JdbcStorageConfig.DATABASE_TYPE.getPropertyName())) {
         Configuration tableConfig = JdbcStorageConfigManager.convertPropertiesToConfiguration(properties);
@@ -117,7 +118,12 @@ public class JdbcSerDe extends AbstractSerDe {
           if (ti.getCategory() != Category.PRIMITIVE) {
             throw new SerDeException("Non primitive types not supported yet");
           }
-          hiveColumnTypes[i] = (PrimitiveTypeInfo) ti;
+          try{
+            hiveColumnTypes[i] = (PrimitiveTypeInfo) ti;
+          }
+          catch (ClassCastException e){
+            throw new HiveException(e);
+          }
           fieldInspectors.add(
               PrimitiveObjectInspectorFactory.getPrimitiveJavaObjectInspector(hiveColumnTypes[i]));
         }
@@ -125,7 +131,7 @@ public class JdbcSerDe extends AbstractSerDe {
             ObjectInspectorFactory.getStandardStructObjectInspector(Arrays.asList(hiveColumnNames),
                 fieldInspectors);
         row = new ArrayList<>(hiveColumnNames.length);
-        serializer = new JdbcSerializer(hiveColumnNames,hiveColumnTypes,row);
+        serializer = new JdbcSerializer(hiveColumnNames,row);
       }
     }
     catch (Exception e) {

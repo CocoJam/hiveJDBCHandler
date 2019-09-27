@@ -93,7 +93,7 @@ public class JdbcRecordIterator implements Iterator<Map<String, Object>> {
         String key = hiveColumnNames[i];
         LOGGER.warn("JdbcRecordITerator hive Col names: " + hiveColumnNames[i]);
         LOGGER.warn("JdbcRecordITerator hive Col type: " + ((PrimitiveTypeInfo) hiveColumnTypesList.get(i)).getPrimitiveCategory());
-//        LOGGER.warn("Meta data : " + meta.getColumnTypeName(i));
+
         Object value = null;
         if (!(hiveColumnTypesList.get(i) instanceof PrimitiveTypeInfo)) {
           throw new RuntimeException("date type of column " + hiveColumnNames[i] + ":" +
@@ -124,13 +124,13 @@ public class JdbcRecordIterator implements Iterator<Map<String, Object>> {
             case CHAR:
             case VARCHAR:
             case STRING:
-              value = rs.getString(i);
+              value = rs.getString(i+1);
               break;
             case DATE:
-              value = rs.getDate(i);
+              value = rs.getDate(i+1);
               break;
             case TIMESTAMP:
-              value = rs.getTimestamp(i);
+              value = rs.getTimestamp(i+1);
               break;
             default:
               LOGGER.warn("date type of column " + hiveColumnNames[i] + ":" +
@@ -147,7 +147,7 @@ public class JdbcRecordIterator implements Iterator<Map<String, Object>> {
         } catch (SQLDataException e) {
           record.put(key, null);
         }
-
+        LOGGER.warn("Meta data : " +  value);
       }
 
       return record;

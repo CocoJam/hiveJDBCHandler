@@ -1,6 +1,5 @@
 package org.apache.hive.storage.jdbc.records;
 
-import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.apache.hadoop.io.MapWritable;
 import org.apache.hadoop.io.Writable;
 import org.apache.hive.storage.jdbc.format.JdbcInputFormat;
@@ -22,7 +21,6 @@ public class JdbcWritable extends MapWritable implements Writable, org.apache.ha
 
     private static final Logger LOGGER = LoggerFactory.getLogger(JdbcWritable.class);
     private Object[] columnValues;
-    private PrimitiveTypeInfo[] hiveColumnTypes;
     private int[] intTypes;
     public HashMap<Writable,Writable> map ;
     
@@ -31,19 +29,13 @@ public class JdbcWritable extends MapWritable implements Writable, org.apache.ha
 		columnValues[i] = javaObject;
     }
     
-    public JdbcWritable() {
-        map = new HashMap<>();
-    }
+    public JdbcWritable() {}
 
     public JdbcWritable(Object[] columnValues, int[] columnTypes) {
         this.columnValues = columnValues;
 //        this.columnTypes = columnTypes;
         map = new HashMap<>();
     }
-    public JdbcWritable(PrimitiveTypeInfo[] hiveColumnTypes) {
-        this.hiveColumnTypes = hiveColumnTypes;
-    }
-
     @Override
     public void write(DataOutput out) throws IOException {
         if (columnValues == null) {
@@ -51,13 +43,12 @@ public class JdbcWritable extends MapWritable implements Writable, org.apache.ha
             LOGGER.warn("writable write int fail due to columnValues");
             return;
         }
-        if (hiveColumnTypes == null) {
-            out.writeInt(-1);
-            LOGGER.warn("writable write int fail due to hiveColumnTypes");
-            return;
-        }
+        // if (hiveColumnTypes == null) {
+        //     out.writeInt(-1);
+        //     LOGGER.warn("writable write int fail due to hiveColumnTypes");
+        //     return;
+        // }
         final Object[] values = this.columnValues;
-        final PrimitiveTypeInfo[] colTypes = this.hiveColumnTypes;
         final int[] types = this.intTypes;
         assert (values.length == types.length);
         out.writeInt(values.length);
@@ -77,7 +68,6 @@ public class JdbcWritable extends MapWritable implements Writable, org.apache.ha
         }
         if (columnValues == null) {
             this.columnValues = new Object[size];
-            this.hiveColumnTypes = new PrimitiveTypeInfo[size];
             this.intTypes = new int[size];
         } else {
             clear();
@@ -94,7 +84,6 @@ public class JdbcWritable extends MapWritable implements Writable, org.apache.ha
     @Override
     public void write(PreparedStatement preparedStatement) throws SQLException {
         assert (columnValues != null);
-        assert (hiveColumnTypes != null);
         final Object[] r = this.columnValues;
         final int cols = r.length;
         for (int i = 0; i < cols; i++) {
